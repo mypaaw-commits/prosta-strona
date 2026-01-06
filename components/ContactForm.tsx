@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import ScrollReveal from './ScrollReveal';
 import { jsPDF } from 'jspdf';
-import { Loader2, CheckCircle, AlertCircle, MailQuestion } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, MailQuestion, ArrowRight } from 'lucide-react';
 
 const ContactForm: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -93,7 +93,6 @@ const ContactForm: React.FC = () => {
     try {
         // 1. Generujemy PDF
         const pdfBlob = generatePDFBlob();
-        // Bezpieczna nazwa pliku (tylko a-z, 0-9 i podkreślniki)
         const safeName = removeAccents(formData.name).replace(/[^a-zA-Z0-9]/g, '_');
         const fileName = `zapytanie_${safeName}.pdf`;
 
@@ -101,17 +100,16 @@ const ContactForm: React.FC = () => {
         const submissionData = new FormData();
         
         // Konfiguracja FormSubmit
-        // Używamy unikalnego tematu, aby Gmail nie grupował wątków
         const uniqueId = new Date().getTime().toString().slice(-4);
-        submissionData.append('_subject', `Nowe zapytanie: ${formData.name} #${uniqueId}`);
+        const subjectName = removeAccents(formData.name); // Safe subject
+        
+        submissionData.append('_subject', `Nowe zapytanie: ${subjectName} #${uniqueId}`);
         submissionData.append('_template', 'table');
-        submissionData.append('_captcha', 'false'); // Wyłączamy captchę dla AJAX
         submissionData.append('email', formData.email); // Reply-To
         
-        // Honeypot (puste pole dla botów)
-        // Note: W AJAX nie wysyłamy pola _honey jeśli jest puste, bo FormData je pominie? Nie, dodajemy je puste.
-        // Jeśli bot wypełni, FormSubmit odrzuci.
-        
+        // Explicitly handle honeypot (leave empty)
+        submissionData.append('_honey', '');
+
         // Dane widoczne w treści maila
         submissionData.append('Klient', formData.name);
         submissionData.append('Email zwrotny', formData.email);
@@ -120,7 +118,9 @@ const ContactForm: React.FC = () => {
         submissionData.append('Wiadomość', formData.message);
 
         // Załącznik PDF
-        submissionData.append('attachment', pdfBlob, fileName);
+        if (pdfBlob.size > 0) {
+            submissionData.append('attachment', pdfBlob, fileName);
+        }
 
         // 3. Wysyłamy do serwisu FormSubmit.co (Endpoint AJAX)
         const response = await fetch("https://formsubmit.co/ajax/mypaaw@gmail.com", {
@@ -130,16 +130,21 @@ const ContactForm: React.FC = () => {
 
         const result = await response.json();
         console.log("Form status:", response.status);
-        console.log("Form result:", result);
 
         if (response.ok) {
             setStatus('success');
             // Pobieramy kopię lokalnie dla klienta
-            const url = window.URL.createObjectURL(pdfBlob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = fileName;
-            link.click();
+            try {
+                const url = window.URL.createObjectURL(pdfBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (err) {
+                console.warn("Could not download PDF automatically", err);
+            }
 
             // Reset formularza
             setFormData({
@@ -185,25 +190,27 @@ const ContactForm: React.FC = () => {
                         <CheckCircle className="w-10 h-10 text-green-600" />
                     </div>
                     <h3 className="text-2xl font-bold text-slate-900 mb-2">Wysłano pomyślnie!</h3>
-                    <p className="text-slate-600 max-w-md">
+                    <p className="text-slate-600 max-w-md mb-8">
                         Twoje zapytanie zostało przekazane. Kopia PDF została pobrana na Twój dysk.
                     </p>
                     
-                    <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-xl text-left max-w-lg">
+                    <div className="p-6 bg-blue-50 border border-blue-200 rounded-2xl text-left max-w-lg shadow-sm">
                         <div className="flex items-start">
-                             <MailQuestion className="w-6 h-6 text-blue-600 mr-3 mt-1 flex-shrink-0" />
+                             <MailQuestion className="w-6 h-6 text-blue-600 mr-4 mt-1 flex-shrink-0" />
                              <div>
-                                 <h4 className="font-bold text-blue-900 mb-1">Nie widzisz maila?</h4>
-                                 <p className="text-sm text-blue-800 mb-2">
-                                     To Twój pierwszy test? <strong>Musisz aktywować formularz.</strong>
+                                 <h4 className="font-bold text-blue-900 mb-2 text-lg">Ważne: Aktywacja maila</h4>
+                                 <p className="text-sm text-blue-800 mb-3 leading-relaxed">
+                                     Jeśli wysyłasz formularz po raz pierwszy, <strong>musisz go aktywować</strong>, abyśmy otrzymali wiadomość.
                                  </p>
-                                 <ol className="text-sm text-blue-700 list-decimal ml-4 space-y-1">
-                                     <li>Wejdź na skrzynkę <strong>mypaaw@gmail.com</strong>.</li>
-                                     <li>Poszukaj maila od nadawcy <strong>FormSubmit</strong> (sprawdź folder SPAM/Oferty).</li>
-                                     <li>Kliknij przycisk <strong>Activate Form</strong> w środku.</li>
-                                 </ol>
-                                 <p className="text-xs text-blue-600 mt-2 italic">
-                                     Po aktywacji wszystkie zaległe wiadomości dotrą natychmiast.
+                                 <div className="bg-white p-4 rounded-xl border border-blue-100 mb-3">
+                                     <ol className="text-sm text-slate-700 list-decimal ml-4 space-y-2">
+                                         <li>Sprawdź swoją skrzynkę (również folder <strong>SPAM</strong>).</li>
+                                         <li>Szukaj maila od <strong>"FormSubmit"</strong>.</li>
+                                         <li>Kliknij przycisk <span className="font-bold text-blue-600">Activate Form</span>.</li>
+                                     </ol>
+                                 </div>
+                                 <p className="text-xs text-blue-600 italic">
+                                     To jednorazowa procedura zabezpieczająca przed spamem.
                                  </p>
                              </div>
                         </div>
@@ -211,9 +218,9 @@ const ContactForm: React.FC = () => {
 
                     <button 
                         onClick={() => setStatus('idle')}
-                        className="mt-8 px-6 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900"
+                        className="mt-8 flex items-center text-sm font-bold text-slate-500 hover:text-blue-600 transition-colors"
                     >
-                        Wyślij kolejne zapytanie
+                        Wyślij kolejne zapytanie <ArrowRight className="ml-1 w-4 h-4" />
                     </button>
                 </div>
             ) : status === 'error' ? (
