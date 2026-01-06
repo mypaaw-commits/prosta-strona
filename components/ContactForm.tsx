@@ -105,7 +105,8 @@ const ContactForm: React.FC = () => {
         
         submissionData.append('_subject', `Nowe zapytanie: ${subjectName} #${uniqueId}`);
         submissionData.append('_template', 'table');
-        submissionData.append('email', formData.email); // Reply-To
+        submissionData.append('email', formData.email); // Reply-To address
+        submissionData.append('_autoresponse', 'off'); // Disable auto-email to visitor
         
         // Explicitly handle honeypot (leave empty)
         submissionData.append('_honey', '');
@@ -117,7 +118,7 @@ const ContactForm: React.FC = () => {
         submissionData.append('Status materiałów', formData.contentStatus);
         submissionData.append('Wiadomość', formData.message);
 
-        // Załącznik PDF
+        // Załącznik PDF (trafi tylko do Ciebie)
         if (pdfBlob.size > 0) {
             submissionData.append('attachment', pdfBlob, fileName);
         }
@@ -133,18 +134,8 @@ const ContactForm: React.FC = () => {
 
         if (response.ok) {
             setStatus('success');
-            // Pobieramy kopię lokalnie dla klienta
-            try {
-                const url = window.URL.createObjectURL(pdfBlob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = fileName;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            } catch (err) {
-                console.warn("Could not download PDF automatically", err);
-            }
+            
+            // Usunięto kod pobierania PDF dla klienta
 
             // Reset formularza
             setFormData({
@@ -189,28 +180,18 @@ const ContactForm: React.FC = () => {
                     <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
                         <CheckCircle className="w-10 h-10 text-green-600" />
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-900 mb-2">Wysłano pomyślnie!</h3>
+                    <h3 className="text-2xl font-bold text-slate-900 mb-2">Formularz wysłany poprawnie!</h3>
                     <p className="text-slate-600 max-w-md mb-8">
-                        Twoje zapytanie zostało przekazane. Kopia PDF została pobrana na Twój dysk.
+                        Dziękujemy za kontakt. Odezwiemy się do Ciebie wkrótce z wyceną.
                     </p>
                     
                     <div className="p-6 bg-blue-50 border border-blue-200 rounded-2xl text-left max-w-lg shadow-sm">
                         <div className="flex items-start">
                              <MailQuestion className="w-6 h-6 text-blue-600 mr-4 mt-1 flex-shrink-0" />
                              <div>
-                                 <h4 className="font-bold text-blue-900 mb-2 text-lg">Ważne: Aktywacja maila</h4>
+                                 <h4 className="font-bold text-blue-900 mb-2 text-lg">Ważne: Pierwsza wysyłka</h4>
                                  <p className="text-sm text-blue-800 mb-3 leading-relaxed">
-                                     Jeśli wysyłasz formularz po raz pierwszy, <strong>musisz go aktywować</strong>, abyśmy otrzymali wiadomość.
-                                 </p>
-                                 <div className="bg-white p-4 rounded-xl border border-blue-100 mb-3">
-                                     <ol className="text-sm text-slate-700 list-decimal ml-4 space-y-2">
-                                         <li>Sprawdź swoją skrzynkę (również folder <strong>SPAM</strong>).</li>
-                                         <li>Szukaj maila od <strong>"FormSubmit"</strong>.</li>
-                                         <li>Kliknij przycisk <span className="font-bold text-blue-600">Activate Form</span>.</li>
-                                     </ol>
-                                 </div>
-                                 <p className="text-xs text-blue-600 italic">
-                                     To jednorazowa procedura zabezpieczająca przed spamem.
+                                     Jeśli to Twoja pierwsza wiadomość przez ten system, sprawdź folder <strong>SPAM</strong>. System antyspamowy mógł (jednorazowo) zatrzymać wiadomość, którą wysłałeś do nas.
                                  </p>
                              </div>
                         </div>
@@ -366,7 +347,7 @@ const ContactForm: React.FC = () => {
                     {status === 'sending' ? (
                         <>
                             <Loader2 className="w-6 h-6 mr-2 animate-spin" />
-                            Wysyłanie formularza i PDF...
+                            Generowanie PDF i wysyłanie...
                         </>
                     ) : (
                         "Wyślij zapytanie"
