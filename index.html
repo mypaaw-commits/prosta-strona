@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#020617" />
     <title>Prosta strona www, która działa</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -41,6 +42,17 @@
       }
     </script>
     <style>
+      /* CRITICAL: Force dark background on the browser canvas to prevent white bar on scroll bounce */
+      :root, html, body {
+        background-color: #020617 !important;
+        color: #f8fafc;
+        height: 100%;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        overscroll-behavior-y: none; /* Prevents the "bounce" revealing background on Mac/iOS */
+      }
+
       /* Custom utilities */
       .animation-delay-100 { animation-delay: 100ms; }
       .animation-delay-200 { animation-delay: 200ms; }
@@ -55,6 +67,28 @@
       
       .animate-fade-in-up, .animate-fade-in {
         opacity: 0;
+      }
+
+      /* Dark Scrollbar Styling (Chrome, Safari, Edge) */
+      ::-webkit-scrollbar {
+        width: 10px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #020617; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #334155; 
+        border-radius: 5px;
+        border: 2px solid #020617; /* Adds padding effect */
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #475569; 
+      }
+
+      /* Dark Scrollbar Styling (Firefox) */
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: #334155 #020617;
       }
     </style>
   <script type="importmap">
