@@ -98,13 +98,16 @@ const ContactForm: React.FC = () => {
         // 2. Tworzymy paczkę danych dla FormSubmit
         const submissionData = new FormData();
         
-        // Pola wymagane przez FormSubmit
-        submissionData.append('email', formData.email); // Od kogo (żebyś mógł odpisać)
+        // Konfiguracja FormSubmit
+        submissionData.append('email', formData.email); // Reply-To
         submissionData.append('_subject', `Nowe zapytanie: ${formData.name}`);
-        submissionData.append('_captcha', 'false'); // Wyłączamy captchę
-        submissionData.append('_template', 'table'); // Ładniejszy wygląd maila
+        submissionData.append('_captcha', 'false');
+        submissionData.append('_template', 'table');
         
-        // Treść formularza
+        // Pole anty-spamowe (musi być puste, ale dodajemy je do FormData jeśli backend tego oczekuje jako hidden)
+        // FormSubmit używa pola o nazwie "_honey" w HTML, w AJAX po prostu nie wysyłamy go, jeśli nie jesteśmy botem.
+        
+        // Dane widoczne w treści maila
         submissionData.append('Imię i Nazwisko', formData.name);
         submissionData.append('Email klienta', formData.email);
         submissionData.append('Typ strony', formData.type);
@@ -114,15 +117,21 @@ const ContactForm: React.FC = () => {
         // Załącznik PDF
         submissionData.append('attachment', pdfBlob, fileName);
 
-        // 3. Wysyłamy do serwisu FormSubmit.co na Twój adres
+        // 3. Wysyłamy do serwisu FormSubmit.co
         const response = await fetch("https://formsubmit.co/mypaaw@gmail.com", {
             method: "POST",
-            body: submissionData
+            body: submissionData,
+            headers: {
+                'Accept': 'application/json'
+            }
         });
+
+        const result = await response.json();
+        console.log("Form response:", result);
 
         if (response.ok) {
             setStatus('success');
-            // Pobieramy też kopię lokalnie dla klienta
+            // Pobieramy kopię lokalnie dla klienta
             const url = window.URL.createObjectURL(pdfBlob);
             const link = document.createElement('a');
             link.href = url;
@@ -139,11 +148,12 @@ const ContactForm: React.FC = () => {
                 consent: false
             });
         } else {
+            console.error("Server responded with error", result);
             throw new Error("Błąd wysyłania");
         }
         
     } catch (error) {
-        console.error(error);
+        console.error("Submission error:", error);
         setStatus('error');
     }
   };
@@ -175,6 +185,9 @@ const ContactForm: React.FC = () => {
                     <p className="text-slate-600 max-w-md">
                         Dziękujemy. Twoje zapytanie wraz z załączonym plikiem PDF zostało przesłane na adres <span className="font-semibold text-blue-600">mypaaw@gmail.com</span>.
                     </p>
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-6 text-sm text-amber-800 text-left">
+                        <strong>Ważne:</strong> Jeśli to Twoja pierwsza wiadomość wysłana przez ten formularz, sprawdź folder <strong>SPAM</strong> i potwierdź aktywację od serwisu "FormSubmit", aby otrzymać załącznik.
+                    </div>
                     <p className="text-slate-400 text-sm mt-4">
                         (Kopia pliku PDF została pobrana na Twoje urządzenie)
                     </p>
@@ -192,7 +205,7 @@ const ContactForm: React.FC = () => {
                     </div>
                     <h3 className="text-2xl font-bold text-slate-900 mb-2">Coś poszło nie tak</h3>
                     <p className="text-slate-600 max-w-md mb-6">
-                        Wystąpił problem z wysłaniem wiadomości. Spróbuj ponownie lub napisz do nas bezpośrednio.
+                        Wystąpił problem z wysłaniem wiadomości. Spróbuj ponownie lub napisz do nas bezpośrednio na mypaaw@gmail.com.
                     </p>
                     <button 
                         onClick={() => setStatus('idle')}
@@ -203,6 +216,10 @@ const ContactForm: React.FC = () => {
                 </div>
             ) : (
                 <form onSubmit={handleSubmit} className="space-y-6">
+                
+                {/* Honeypot for bots */}
+                <input type="text" name="_honey" style={{display: 'none'}} />
+
                 {/* Name */}
                 <div>
                     <label htmlFor="name" className="block text-sm font-semibold text-slate-700 mb-2">Imię i nazwisko <span className="text-blue-600">*</span></label>
