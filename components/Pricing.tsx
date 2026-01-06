@@ -113,7 +113,7 @@ const Pricing: React.FC = () => {
         </div>
         
         <ScrollReveal delay="delay-500" className="mt-12 text-center">
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-300">
                 U nas nie ma gwiazdek. Jeśli zakres się zmienia, cenę ustalamy z góry przed startem prac.
             </p>
         </ScrollReveal>
