@@ -35,7 +35,8 @@ const ContactForm: React.FC = () => {
     return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ł/g, "l").replace(/Ł/g, "L");
   };
 
-  const generatePDFBlob = (): Blob => {
+  // Zmieniono z Blob na File dla lepszej kompatybilności z formularzami
+  const generatePDFFile = (): File => {
     const doc = new jsPDF();
     
     // Konfiguracja PDF
@@ -83,7 +84,15 @@ const ContactForm: React.FC = () => {
     doc.setTextColor(100);
     doc.text("Wygenerowano automatycznie przez formularz prosta-strona.pl", 20, 280);
 
-    return doc.output('blob');
+    // Generujemy Blob
+    const blob = doc.output('blob');
+    
+    // Tworzymy bezpieczną nazwę pliku
+    const safeName = removeAccents(formData.name).replace(/[^a-zA-Z0-9]/g, '_');
+    const fileName = `zapytanie_${safeName}.pdf`;
+
+    // Konwertujemy Blob na File z jawnym typem MIME
+    return new File([blob], fileName, { type: "application/pdf" });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -91,39 +100,34 @@ const ContactForm: React.FC = () => {
     setStatus('sending');
 
     try {
-        // 1. Generujemy PDF
-        const pdfBlob = generatePDFBlob();
-        const safeName = removeAccents(formData.name).replace(/[^a-zA-Z0-9]/g, '_');
-        const fileName = `zapytanie_${safeName}.pdf`;
+        // 1. Generujemy plik PDF
+        const pdfFile = generatePDFFile();
 
         // 2. Tworzymy paczkę danych dla FormSubmit
         const submissionData = new FormData();
         
         // Konfiguracja FormSubmit
         const uniqueId = new Date().getTime().toString().slice(-4);
-        const subjectName = removeAccents(formData.name); // Safe subject
+        const subjectName = removeAccents(formData.name);
         
         submissionData.append('_subject', `Nowe zapytanie: ${subjectName} #${uniqueId}`);
         submissionData.append('_template', 'table');
-        submissionData.append('email', formData.email); // Reply-To address
-        submissionData.append('_autoresponse', 'off'); // Disable auto-email to visitor
-        
-        // Explicitly handle honeypot (leave empty)
-        submissionData.append('_honey', '');
+        submissionData.append('email', formData.email); // Reply-To
+        submissionData.append('_autoresponse', 'off'); // Wyłączamy auto-odpowiedź dla klienta
+        submissionData.append('_honey', ''); // Honeypot
 
-        // Dane widoczne w treści maila
+        // Dane tekstowe
         submissionData.append('Klient', formData.name);
         submissionData.append('Email zwrotny', formData.email);
         submissionData.append('Typ strony', formData.type);
         submissionData.append('Status materiałów', formData.contentStatus);
         submissionData.append('Wiadomość', formData.message);
 
-        // Załącznik PDF (trafi tylko do Ciebie)
-        if (pdfBlob.size > 0) {
-            submissionData.append('attachment', pdfBlob, fileName);
-        }
+        // 3. Załącznik - dodajemy jako ostatni element, jako File object
+        // Używamy nazwy 'attachment' która jest standardem dla FormSubmit
+        submissionData.append('attachment', pdfFile);
 
-        // 3. Wysyłamy do serwisu FormSubmit.co (Endpoint AJAX)
+        // 4. Wysyłamy
         const response = await fetch("https://formsubmit.co/ajax/mypaaw@gmail.com", {
             method: "POST",
             body: submissionData
@@ -134,10 +138,6 @@ const ContactForm: React.FC = () => {
 
         if (response.ok) {
             setStatus('success');
-            
-            // Usunięto kod pobierania PDF dla klienta
-
-            // Reset formularza
             setFormData({
                 name: '',
                 email: '',
