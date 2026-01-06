@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import ScrollReveal from './ScrollReveal';
 import { jsPDF } from 'jspdf';
-import { Loader2, CheckCircle } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 
 const ContactForm: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -13,7 +13,7 @@ const ContactForm: React.FC = () => {
     consent: false
   });
   
-  const [status, setStatus] = useState<'idle' | 'sending' | 'success'>('idle');
+  const [status, setStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -30,12 +30,12 @@ const ContactForm: React.FC = () => {
     }));
   };
 
-  // Funkcja usuwająca polskie znaki dla biblioteki jsPDF (standardowe czcionki nie obsługują UTF-8)
+  // Funkcja usuwająca polskie znaki dla biblioteki jsPDF
   const removeAccents = (str: string) => {
     return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ł/g, "l").replace(/Ł/g, "L");
   };
 
-  const generateAndSendPDF = () => {
+  const generatePDFBlob = (): Blob => {
     const doc = new jsPDF();
     
     // Konfiguracja PDF
@@ -56,7 +56,6 @@ const ContactForm: React.FC = () => {
     
     doc.setFont("helvetica", "normal");
     doc.setFontSize(12);
-    // Używamy removeAccents, aby uniknąć "krzaczków" w standardowej czcionce PDF
     doc.text(`Imie i nazwisko: ${removeAccents(formData.name)}`, 20, 60);
     doc.text(`Email: ${formData.email}`, 20, 70);
     
@@ -84,43 +83,68 @@ const ContactForm: React.FC = () => {
     doc.setTextColor(100);
     doc.text("Wygenerowano automatycznie przez formularz prosta-strona.pl", 20, 280);
 
-    // Symulacja wysyłki emaila z załącznikiem
-    // W prawdziwej aplikacji tutaj nastąpiłby call do backendu (np. formData z blobem PDF)
-    
-    const pdfBlob = doc.output('blob');
-    console.log("PDF wygenerowany. Rozmiar:", pdfBlob.size, "bajtów.");
-    console.log("Adresat:", "mypaaw@gmail.com");
-
-    // Dodatkowo pobieramy plik, aby użytkownik widział co zostało "wysłane"
-    doc.save(`zapytanie_${removeAccents(formData.name).replace(/\s+/g, '_')}.pdf`);
+    return doc.output('blob');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus('sending');
 
-    // Symulacja czasu wysyłki
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
     try {
-        generateAndSendPDF();
-        setStatus('success');
+        // 1. Generujemy PDF
+        const pdfBlob = generatePDFBlob();
+        const fileName = `zapytanie_${removeAccents(formData.name).replace(/\s+/g, '_')}.pdf`;
+
+        // 2. Tworzymy paczkę danych dla FormSubmit
+        const submissionData = new FormData();
         
-        // Reset formularza
-        setFormData({
-            name: '',
-            email: '',
-            type: 'Jeszcze nie wiem',
-            contentStatus: 'Częściowo',
-            message: '',
-            consent: false
+        // Pola wymagane przez FormSubmit
+        submissionData.append('email', formData.email); // Od kogo (żebyś mógł odpisać)
+        submissionData.append('_subject', `Nowe zapytanie: ${formData.name}`);
+        submissionData.append('_captcha', 'false'); // Wyłączamy captchę
+        submissionData.append('_template', 'table'); // Ładniejszy wygląd maila
+        
+        // Treść formularza
+        submissionData.append('Imię i Nazwisko', formData.name);
+        submissionData.append('Email klienta', formData.email);
+        submissionData.append('Typ strony', formData.type);
+        submissionData.append('Materiały', formData.contentStatus);
+        submissionData.append('Wiadomość', formData.message);
+
+        // Załącznik PDF
+        submissionData.append('attachment', pdfBlob, fileName);
+
+        // 3. Wysyłamy do serwisu FormSubmit.co na Twój adres
+        const response = await fetch("https://formsubmit.co/mypaaw@gmail.com", {
+            method: "POST",
+            body: submissionData
         });
+
+        if (response.ok) {
+            setStatus('success');
+            // Pobieramy też kopię lokalnie dla klienta
+            const url = window.URL.createObjectURL(pdfBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            link.click();
+
+            // Reset formularza
+            setFormData({
+                name: '',
+                email: '',
+                type: 'Jeszcze nie wiem',
+                contentStatus: 'Częściowo',
+                message: '',
+                consent: false
+            });
+        } else {
+            throw new Error("Błąd wysyłania");
+        }
         
-        setTimeout(() => setStatus('idle'), 5000);
     } catch (error) {
         console.error(error);
-        alert("Wystąpił błąd podczas generowania PDF.");
-        setStatus('idle');
+        setStatus('error');
     }
   };
 
@@ -135,7 +159,7 @@ const ContactForm: React.FC = () => {
                 Skontaktuj się z nami
             </h2>
             <p className="text-lg text-slate-600">
-                Wypełnij formularz poniżej, a wygenerujemy podsumowanie Twojego zapytania w PDF i prześlemy je do analizy.
+                Wypełnij formularz poniżej. Wygenerujemy PDF z Twoim zapytaniem i prześlemy go do naszej wyceny.
             </p>
         </ScrollReveal>
 
@@ -147,18 +171,34 @@ const ContactForm: React.FC = () => {
                     <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
                         <CheckCircle className="w-10 h-10 text-green-600" />
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-900 mb-2">Formularz wysłany!</h3>
+                    <h3 className="text-2xl font-bold text-slate-900 mb-2">Wiadomość wysłana!</h3>
                     <p className="text-slate-600 max-w-md">
-                        Dziękujemy. Kopia zapytania w formacie PDF została wygenerowana i przesłana do weryfikacji na adres <span className="font-semibold text-blue-600">mypaaw@gmail.com</span>.
+                        Dziękujemy. Twoje zapytanie wraz z załączonym plikiem PDF zostało przesłane na adres <span className="font-semibold text-blue-600">mypaaw@gmail.com</span>.
                     </p>
                     <p className="text-slate-400 text-sm mt-4">
-                        (Plik PDF został również pobrany na Twoje urządzenie jako potwierdzenie)
+                        (Kopia pliku PDF została pobrana na Twoje urządzenie)
                     </p>
                     <button 
                         onClick={() => setStatus('idle')}
                         className="mt-8 px-6 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900"
                     >
                         Wyślij kolejne zapytanie
+                    </button>
+                </div>
+            ) : status === 'error' ? (
+                 <div className="flex flex-col items-center justify-center py-12 text-center animate-fade-in">
+                    <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
+                        <AlertCircle className="w-10 h-10 text-red-600" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-slate-900 mb-2">Coś poszło nie tak</h3>
+                    <p className="text-slate-600 max-w-md mb-6">
+                        Wystąpił problem z wysłaniem wiadomości. Spróbuj ponownie lub napisz do nas bezpośrednio.
+                    </p>
+                    <button 
+                        onClick={() => setStatus('idle')}
+                        className="px-6 py-2 text-sm font-bold text-white bg-blue-600 rounded-full hover:bg-blue-700"
+                    >
+                        Spróbuj ponownie
                     </button>
                 </div>
             ) : (
@@ -284,7 +324,7 @@ const ContactForm: React.FC = () => {
                     {status === 'sending' ? (
                         <>
                             <Loader2 className="w-6 h-6 mr-2 animate-spin" />
-                            Generowanie PDF i wysyłanie...
+                            Wysyłanie formularza i PDF...
                         </>
                     ) : (
                         "Wyślij zapytanie"
