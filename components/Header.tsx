@@ -29,12 +29,11 @@ const Header: React.FC = () => {
       }`}
     >
       <div className="container mx-auto px-4 md:px-6 relative flex items-center justify-between">
-        {/* Logo */}
+        {/* Logo - Text Version with Hyphen lowercase */}
         <a href="#" className="flex items-center gap-2 group relative z-50 flex-shrink-0">
-          <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/50 group-hover:scale-105 transition-transform duration-200">
-             <span className="text-white font-bold text-lg">L</span>
-          </div>
-          <span className="text-xl font-bold text-white tracking-tight">Twoje Logo</span>
+          <span className="text-xl md:text-2xl font-bold text-white tracking-tight">
+            prosta-<span className="text-blue-500">strona</span>.pl
+          </span>
         </a>
 
         {/* Desktop Nav - Centered */}

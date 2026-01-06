@@ -2,8 +2,17 @@ import React from 'react';
 
 const Footer: React.FC = () => {
   return (
-    <footer className="bg-slate-950 py-8 border-t border-white/5">
+    <footer className="bg-slate-950 py-12 border-t border-white/5">
       <div className="container mx-auto px-4 text-center">
+        {/* Logo in Footer */}
+        <div className="mb-6">
+            <a href="#" className="inline-block group">
+                <span className="text-2xl font-bold text-white tracking-tight">
+                    prosta-<span className="text-blue-500">strona</span>.pl
+                </span>
+            </a>
+        </div>
+
         <p className="text-slate-500 text-sm mb-4">
           &copy; 2026 prosta-strona.pl. Wszelkie prawa zastrzeżone.
         </p>
