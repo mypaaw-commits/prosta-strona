@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import ScrollReveal from './ScrollReveal';
 import { jsPDF } from 'jspdf';
-import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, MailQuestion } from 'lucide-react';
 
 const ContactForm: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -93,41 +93,44 @@ const ContactForm: React.FC = () => {
     try {
         // 1. Generujemy PDF
         const pdfBlob = generatePDFBlob();
-        const fileName = `zapytanie_${removeAccents(formData.name).replace(/\s+/g, '_')}.pdf`;
+        // Bezpieczna nazwa pliku (tylko a-z, 0-9 i podkreślniki)
+        const safeName = removeAccents(formData.name).replace(/[^a-zA-Z0-9]/g, '_');
+        const fileName = `zapytanie_${safeName}.pdf`;
 
         // 2. Tworzymy paczkę danych dla FormSubmit
         const submissionData = new FormData();
         
         // Konfiguracja FormSubmit
-        submissionData.append('email', formData.email); // Reply-To
-        submissionData.append('_subject', `Nowe zapytanie: ${formData.name}`);
-        submissionData.append('_captcha', 'false');
+        // Używamy unikalnego tematu, aby Gmail nie grupował wątków
+        const uniqueId = new Date().getTime().toString().slice(-4);
+        submissionData.append('_subject', `Nowe zapytanie: ${formData.name} #${uniqueId}`);
         submissionData.append('_template', 'table');
+        submissionData.append('_captcha', 'false'); // Wyłączamy captchę dla AJAX
+        submissionData.append('email', formData.email); // Reply-To
         
-        // Pole anty-spamowe (musi być puste, ale dodajemy je do FormData jeśli backend tego oczekuje jako hidden)
-        // FormSubmit używa pola o nazwie "_honey" w HTML, w AJAX po prostu nie wysyłamy go, jeśli nie jesteśmy botem.
+        // Honeypot (puste pole dla botów)
+        // Note: W AJAX nie wysyłamy pola _honey jeśli jest puste, bo FormData je pominie? Nie, dodajemy je puste.
+        // Jeśli bot wypełni, FormSubmit odrzuci.
         
         // Dane widoczne w treści maila
-        submissionData.append('Imię i Nazwisko', formData.name);
-        submissionData.append('Email klienta', formData.email);
+        submissionData.append('Klient', formData.name);
+        submissionData.append('Email zwrotny', formData.email);
         submissionData.append('Typ strony', formData.type);
-        submissionData.append('Materiały', formData.contentStatus);
+        submissionData.append('Status materiałów', formData.contentStatus);
         submissionData.append('Wiadomość', formData.message);
 
         // Załącznik PDF
         submissionData.append('attachment', pdfBlob, fileName);
 
-        // 3. Wysyłamy do serwisu FormSubmit.co
-        const response = await fetch("https://formsubmit.co/mypaaw@gmail.com", {
+        // 3. Wysyłamy do serwisu FormSubmit.co (Endpoint AJAX)
+        const response = await fetch("https://formsubmit.co/ajax/mypaaw@gmail.com", {
             method: "POST",
-            body: submissionData,
-            headers: {
-                'Accept': 'application/json'
-            }
+            body: submissionData
         });
 
         const result = await response.json();
-        console.log("Form response:", result);
+        console.log("Form status:", response.status);
+        console.log("Form result:", result);
 
         if (response.ok) {
             setStatus('success');
@@ -148,12 +151,12 @@ const ContactForm: React.FC = () => {
                 consent: false
             });
         } else {
-            console.error("Server responded with error", result);
-            throw new Error("Błąd wysyłania");
+            console.error("Błąd wysyłania: ", result);
+            throw new Error(result.message || "Błąd wysyłania");
         }
         
     } catch (error) {
-        console.error("Submission error:", error);
+        console.error("Critical submission error:", error);
         setStatus('error');
     }
   };
@@ -181,16 +184,31 @@ const ContactForm: React.FC = () => {
                     <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
                         <CheckCircle className="w-10 h-10 text-green-600" />
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-900 mb-2">Wiadomość wysłana!</h3>
+                    <h3 className="text-2xl font-bold text-slate-900 mb-2">Wysłano pomyślnie!</h3>
                     <p className="text-slate-600 max-w-md">
-                        Dziękujemy. Twoje zapytanie wraz z załączonym plikiem PDF zostało przesłane na adres <span className="font-semibold text-blue-600">mypaaw@gmail.com</span>.
+                        Twoje zapytanie zostało przekazane. Kopia PDF została pobrana na Twój dysk.
                     </p>
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-6 text-sm text-amber-800 text-left">
-                        <strong>Ważne:</strong> Jeśli to Twoja pierwsza wiadomość wysłana przez ten formularz, sprawdź folder <strong>SPAM</strong> i potwierdź aktywację od serwisu "FormSubmit", aby otrzymać załącznik.
+                    
+                    <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-xl text-left max-w-lg">
+                        <div className="flex items-start">
+                             <MailQuestion className="w-6 h-6 text-blue-600 mr-3 mt-1 flex-shrink-0" />
+                             <div>
+                                 <h4 className="font-bold text-blue-900 mb-1">Nie widzisz maila?</h4>
+                                 <p className="text-sm text-blue-800 mb-2">
+                                     To Twój pierwszy test? <strong>Musisz aktywować formularz.</strong>
+                                 </p>
+                                 <ol className="text-sm text-blue-700 list-decimal ml-4 space-y-1">
+                                     <li>Wejdź na skrzynkę <strong>mypaaw@gmail.com</strong>.</li>
+                                     <li>Poszukaj maila od nadawcy <strong>FormSubmit</strong> (sprawdź folder SPAM/Oferty).</li>
+                                     <li>Kliknij przycisk <strong>Activate Form</strong> w środku.</li>
+                                 </ol>
+                                 <p className="text-xs text-blue-600 mt-2 italic">
+                                     Po aktywacji wszystkie zaległe wiadomości dotrą natychmiast.
+                                 </p>
+                             </div>
+                        </div>
                     </div>
-                    <p className="text-slate-400 text-sm mt-4">
-                        (Kopia pliku PDF została pobrana na Twoje urządzenie)
-                    </p>
+
                     <button 
                         onClick={() => setStatus('idle')}
                         className="mt-8 px-6 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900"
@@ -203,9 +221,9 @@ const ContactForm: React.FC = () => {
                     <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
                         <AlertCircle className="w-10 h-10 text-red-600" />
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-900 mb-2">Coś poszło nie tak</h3>
+                    <h3 className="text-2xl font-bold text-slate-900 mb-2">Błąd wysyłania</h3>
                     <p className="text-slate-600 max-w-md mb-6">
-                        Wystąpił problem z wysłaniem wiadomości. Spróbuj ponownie lub napisz do nas bezpośrednio na mypaaw@gmail.com.
+                        Nie udało się wysłać formularza. Może to być chwilowy problem z siecią.
                     </p>
                     <button 
                         onClick={() => setStatus('idle')}
