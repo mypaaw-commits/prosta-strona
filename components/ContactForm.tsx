@@ -110,10 +110,12 @@ const ContactForm: React.FC = () => {
         const uniqueId = new Date().getTime().toString().slice(-4);
         const subjectName = removeAccents(formData.name);
         
+        // WAŻNE: Ustawienia sterujące zachowaniem FormSubmit
         submissionData.append('_subject', `Nowe zapytanie: ${subjectName} #${uniqueId}`);
         submissionData.append('_template', 'table');
         submissionData.append('email', formData.email); // Reply-To
         submissionData.append('_autoresponse', 'off'); // Wyłączamy auto-odpowiedź dla klienta
+        submissionData.append('_captcha', 'false'); // Wyłączamy captchę, żeby nie blokowała uploadu w tle
         submissionData.append('_honey', ''); // Honeypot
 
         // Dane tekstowe
@@ -123,14 +125,17 @@ const ContactForm: React.FC = () => {
         submissionData.append('Status materiałów', formData.contentStatus);
         submissionData.append('Wiadomość', formData.message);
 
-        // 3. Załącznik - dodajemy jako ostatni element, jako File object
-        // Używamy nazwy 'attachment' która jest standardem dla FormSubmit
+        // 3. Załącznik - musi być obiektem File
         submissionData.append('attachment', pdfFile);
 
-        // 4. Wysyłamy
-        const response = await fetch("https://formsubmit.co/ajax/mypaaw@gmail.com", {
+        // 4. Wysyłamy - ZMIANA: używamy głównego endpointu ale z nagłówkiem JSON
+        // Endpoint /ajax/ czasem gubi pliki. Standardowy endpoint + Accept: application/json działa stabilniej.
+        const response = await fetch("https://formsubmit.co/mypaaw@gmail.com", {
             method: "POST",
-            body: submissionData
+            body: submissionData,
+            headers: {
+                'Accept': 'application/json'
+            }
         });
 
         const result = await response.json();
