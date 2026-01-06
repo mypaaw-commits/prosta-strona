@@ -17,7 +17,7 @@ const Footer: React.FC = () => {
           &copy; 2026 prosta-strona.pl. Wszelkie prawa zastrzeżone.
         </p>
         <div id="polityka">
-            <a href="#" className="text-slate-600 text-xs hover:text-blue-400 cursor-pointer transition-colors underline decoration-slate-800 hover:decoration-blue-400">
+            <a href="#polityka-prywatnosci" className="text-slate-600 text-xs hover:text-blue-400 cursor-pointer transition-colors underline decoration-slate-800 hover:decoration-blue-400">
                 Polityka Prywatności
             </a>
         </div>
